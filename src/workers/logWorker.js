@@ -1,14 +1,30 @@
 // src/workers/logWorker.js
 const mongoose = require('mongoose');
-const logQueue = require('../queue/logQueue');
+// const logQueue = require('../queue/logQueue');
 const ApiLog    = require('../models/ApiLog');
+const Queue = require('bull');
 
 
-// ensure Mongo is connected in this process
-mongoose.connect('mongodb+srv://sayman:sayman@cluster0.rl0sfdh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', {
 
+// Optional: graceful shutdown
+function shutdown() {
+  logQueue.close().then(() => process.exit(0));
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+// src/server.js
+const express    = require('express');
+
+async function start() {
+  // 1. Connect to MongoDB
+  await mongoose.connect('mongodb+srv://sayman:sayman@cluster0.rl0sfdh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
+
+  const app = express();
+  app.use(express.json());
+const logQueue = new Queue('api-logs', {
+  redis: { host: process.env.REDIS_HOST, port: process.env.REDIS_PORT }
 });
-
 // Process jobs from the queue
 logQueue.process(async (job) => {
     console.log('request reiceved job',job)
@@ -17,9 +33,13 @@ logQueue.process(async (job) => {
   await ApiLog.create(data);
 });
 
-// Optional: graceful shutdown
-function shutdown() {
-  logQueue.close().then(() => process.exit(0));
+
+  app.listen(3002, () => {
+    console.log('API listening on port 3000');
+  });
 }
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+
+start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});

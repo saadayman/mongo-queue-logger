@@ -5,7 +5,9 @@ const ApiLog    = require('../models/ApiLog');
 const Queue = require('bull');
 
 
-
+const logQueue = new Queue('api-logs', {
+    redis: { host: process.env.REDIS_HOST, port: process.env.REDIS_PORT }
+  });
 // Optional: graceful shutdown
 function shutdown() {
   logQueue.close().then(() => process.exit(0));
@@ -22,9 +24,7 @@ async function start() {
 
   const app = express();
   app.use(express.json());
-const logQueue = new Queue('api-logs', {
-  redis: { host: process.env.REDIS_HOST, port: process.env.REDIS_PORT }
-});
+
 // Process jobs from the queue
 logQueue.process(async (job) => {
     console.log('request reiceved job',job)
